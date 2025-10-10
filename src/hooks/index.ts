@@ -1,0 +1,1 @@
+export { useWhatsAppContact } from './useWhatsAppContact';
