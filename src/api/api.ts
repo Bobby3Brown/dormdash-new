@@ -1,4 +1,4 @@
-const BASE = 'https://dormdashbackend.onrender.com/';
+const BASE = 'https://dormdashbackend.onrender.com';
 
 function getToken(): string | null {
   try {

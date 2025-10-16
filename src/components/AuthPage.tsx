@@ -62,7 +62,7 @@ export function AuthPage({ onAuth }: AuthPageProps) {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-  const API_URL = "https://dormdashbackend.onrender.com/";
+  const API_URL = "https://dormdashbackend.onrender.com";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

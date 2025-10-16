@@ -84,7 +84,7 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
     let mounted = true;
     (async () => {
       try {
-        const res  =  await fetch(`http://localhost:2100/product/all`)
+        const res  =  await fetch(`https://dormdashbackend.onrender.com/product/all`)
         const all = await res.json();
         if (!mounted) return;
         // Map backend product shape to frontend Property type

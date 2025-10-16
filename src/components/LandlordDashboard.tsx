@@ -75,7 +75,7 @@ import { Password } from "./AuthPage";
 interface LandlordDashboardProps {
   user?: UserType;
 }
-const API_URL = `https://dormdashbackend.onrender.com/`
+const API_URL = `https://dormdashbackend.onrender.com`
 
 export function LandlordDashboard({ user }: LandlordDashboardProps) {
   const ctx = useUser();
@@ -108,8 +108,7 @@ export function LandlordDashboard({ user }: LandlordDashboardProps) {
     // Fetch landlord properties
     const fetchProperties = async () => {
       try {
-        const res = await fetch(
-          `/product/owner/${resolvedUser?.email}`
+        const res = await fetch(`${API_URL}/product/owner/${resolvedUser?.email}`
         );
         if (!res.ok) throw new Error("Error fetching properties");
         const data = await res.json();
