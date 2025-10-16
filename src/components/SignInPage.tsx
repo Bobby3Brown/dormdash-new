@@ -6,7 +6,8 @@ import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import * as api from '../api/api';
 
 interface SignInPageProps {
   onAuth: (userData: any) => void;
@@ -27,24 +28,25 @@ export function SignInPage({ onAuth, onNavigateToSignUp, onNavigateHome }: SignI
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Mock authentication - in real app, validate against backend
-    const userData = {
-      id: 1,
-      name: 'John Doe',
-      email: formData.email,
-      phone: '+234 800 000 0000',
-      role: 'landlord', // This would come from the backend
-      verified: true,
-      registrationDate: new Date().toISOString().split('T')[0]
-    };
-    
-    setIsLoading(false);
-    toast.success('Login successful! Welcome back.');
-    onAuth(userData);
+    try {
+      await api.login(formData.email, formData.password);
+      const userData = {
+        id: 1,
+        name: 'John Doe',
+        email: formData.email,
+        phone: '+234 800 000 0000',
+        role: 'landlord', // This would come from the backend
+        verified: true,
+        registrationDate: new Date().toISOString().split('T')[0]
+      };
+      setIsLoading(false);
+      toast.success('Login successful! Welcome back.');
+      onAuth(userData);
+    } catch (err: any) {
+      setIsLoading(false);
+      console.error('Login failed', err);
+      toast.error(err?.message || 'Login failed');
+    }
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -121,7 +123,7 @@ export function SignInPage({ onAuth, onNavigateToSignUp, onNavigateHome }: SignI
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     checked={formData.rememberMe}
-                    onCheckedChange={(checked) => handleInputChange('rememberMe', checked)}
+                    onCheckedChange={(checked: boolean) => handleInputChange('rememberMe', checked)}
                   />
                   <label className="text-sm text-gray-700">
                     Remember me

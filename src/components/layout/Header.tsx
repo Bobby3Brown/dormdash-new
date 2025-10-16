@@ -3,8 +3,10 @@ import { Building, Menu, X, User, Settings, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { User as UserType, PageType } from '../../types';
-import { navigationItems } from '../../data/navigation';
+import { User as UserType, PageType, NavigationItem } from '../../types';
+// import { navigationItems } from '../../data/navigation
+
+
 
 interface HeaderProps {
   currentPage: PageType;
@@ -22,6 +24,16 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigationItems: NavigationItem[] = user ? [
+  { id: 'home', name: 'Home' },
+  { id: 'search', name: 'Search' },
+  { id: 'boosting', name: 'Boosting' },
+  // { id: 'auth', name: 'Login' }
+] : [
+   { id: 'home', name: 'Home' },
+  { id: 'search', name: 'Search' },
+  { id: 'auth', name: 'Login' }
+];
 
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
@@ -84,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-sm text-blue-600 font-medium">
-                          {user.name.charAt(0).toUpperCase()}
+                          {user.name.charAt(0).toUpperCase() || ""}
                         </span>
                       </div>
                       <span className="text-gray-700">{user.name}</span>

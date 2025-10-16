@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { HomePage } from './components/home/HomePage';
@@ -10,14 +10,35 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { AuthPage } from './components/AuthPage';
 import { BoostingServices } from './components/BoostingServices';
 import { ProfilePage } from './components/ProfilePage';
-import { mockUsers, defaultUser } from './data/mockUsers';
+// import { mockUsers, defaultUser } from './data/mockUsers';
 import { User, PageType, Property } from './types';
 import { Toaster } from './components/ui/sonner';
+import { UserProvider, useUser } from './context/UserContext';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [user, setUser] = useState<User | null>(null);
+
+  // Small component to sync the local `user` (typed User from /types)
+  // into the more form-centric UserContext (fullname, email, number, ...).
+  const SyncUserContext: React.FC<{ user: User | null }> = ({ user: ctxUser }) => {
+    const { setFullname, setEmail, setNumber } = useUser();
+
+    useEffect(() => {
+      if (ctxUser) {
+        setFullname(ctxUser.name || '');
+        setEmail(ctxUser.email || '');
+        setNumber(ctxUser.phone || '');
+      } else {
+        setFullname('');
+        setEmail('');
+        setNumber('');
+      }
+    }, [ctxUser, setFullname, setEmail, setNumber]);
+
+    return null;
+  };
 
   const handlePropertySelect = (property: Property) => {
     setSelectedProperty(property);
@@ -26,7 +47,8 @@ function App() {
 
   const handleUserRoleChange = (role: string) => {
     // Update user with appropriate mock user data for the role
-    const newUser = mockUsers[role] || { ...user, role } as User;
+    const base = user || { id: 'local-guest', name: 'Guest', email: '', phone: '', role: 'student', verified: false } as User;
+    const newUser: User = { ...base, role: role as any };
     setUser(newUser);
     
     // Automatically navigate to appropriate dashboard for landlords/agents/admin
@@ -98,22 +120,26 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Toaster position="top-right" richColors />
-      <Header
-        currentPage={currentPage}
-        user={user}
-        onNavigate={setCurrentPage}
-        onUserRoleChange={handleUserRoleChange}
-        onLogout={handleLogout}
-      />
-      
-      <main>
-        {renderPage()}
-      </main>
+    <UserProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Toaster position="top-right" richColors />
+        {/* sync local user into context (no-op if user is null) */}
+        <SyncUserContext user={user} />
+        <Header
+          currentPage={currentPage}
+          user={user}
+          onNavigate={setCurrentPage}
+          onUserRoleChange={handleUserRoleChange}
+          onLogout={handleLogout}
+        />
 
-      <Footer />
-    </div>
+        <main>
+          {renderPage()}
+        </main>
+
+        <Footer />
+      </div>
+    </UserProvider>
   );
 }
 

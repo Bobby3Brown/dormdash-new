@@ -30,6 +30,18 @@ export function PropertyDetail({ property, onBack }: PropertyDetailProps) {
     });
   }, [api]);
 
+  // Defensive local values to avoid runtime errors when fields are missing
+  const images: string[] = Array.isArray(property?.images) ? property.images : [];
+  const imageCount = images.length;
+  const landlord = property?.landlord || { name: 'Owner', phone: '', verified: false };
+  const agent = property?.agent || null;
+  const price = typeof property?.price === 'number' ? property.price : Number(property?.rent || 0);
+  const safetyRating = property?.safetyRating ?? 'N/A';
+  const reviewsCount = Number(property?.reviews || 0);
+  const amenities: string[] = Array.isArray(property?.amenities) ? property.amenities : [];
+  const isBoosting = Boolean(property?.isBoostingActive);
+  const boostType = property?.boostType;
+
   // WhatsApp contact functions
   const handleWhatsAppContact = (contactName: string, phone: string, propertyTitle: string) => {
     const message = `Hi ${contactName}, I'm interested in your property "${propertyTitle}" listed on DormDash. Could you please provide more information?`;
@@ -179,10 +191,10 @@ export function PropertyDetail({ property, onBack }: PropertyDetailProps) {
                   ₦{property.price.toLocaleString()}/year
                 </div>
                 <div className="flex items-center">
-                  <Star className="h-4 w-4 text-yellow-400 mr-1" />
+                  {/* <Star className="h-4 w-4 text-yellow-400 mr-1" />
                   <span className="text-sm text-gray-600">
                     {property.safetyRating} ({property.reviews} reviews)
-                  </span>
+                  </span> */}
                 </div>
               </div>
             </div>
@@ -221,7 +233,7 @@ export function PropertyDetail({ property, onBack }: PropertyDetailProps) {
           </div>
 
           {/* Reviews */}
-          <div>
+          {/* <div>
             <h3 className="text-lg text-gray-900 mb-4">Reviews</h3>
             <div className="space-y-4">
               {reviews.map((review) => (
@@ -254,7 +266,7 @@ export function PropertyDetail({ property, onBack }: PropertyDetailProps) {
                 </Card>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Sidebar */}
@@ -374,17 +386,17 @@ export function PropertyDetail({ property, onBack }: PropertyDetailProps) {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-gray-700">Area Safety Rating</span>
-                <div className="flex items-center">
+                {/* <span className="text-sm text-gray-700">Area Safety Rating</span> */}
+                {/* <div className="flex items-center">
                   <Star className="h-4 w-4 text-yellow-400 mr-1" />
                   <span className="text-sm">{property.safetyRating}/5</span>
-                </div>
+                </div> */}
               </div>
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
+                {/* <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Security</span>
                   <span className="text-green-600">Good</span>
-                </div>
+                </div> */}
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Transportation</span>
                   <span className="text-green-600">Excellent</span>
@@ -398,7 +410,7 @@ export function PropertyDetail({ property, onBack }: PropertyDetailProps) {
           </Card>
 
           {/* Similar Properties */}
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle>Similar Properties</CardTitle>
             </CardHeader>
@@ -410,7 +422,7 @@ export function PropertyDetail({ property, onBack }: PropertyDetailProps) {
                 View Similar
               </Button>
             </CardContent>
-          </Card>
+          </Card> */}
         </div>
       </div>
     </div>

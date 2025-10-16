@@ -8,8 +8,8 @@ import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { Slider } from './ui/slider';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { mockProperties } from '../data/mockProperties';
 import { Property } from '../types';
+import { getAllProducts } from '../api/api';
 import { useWhatsAppContact } from '../hooks';
 
 interface PropertySearchProps {
@@ -25,6 +25,7 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('relevance');
+  const [allProperties, setAllProperties] = useState<Property[]>([]);
 
   const locations = ['Lagos State', 'Oyo State', 'Ogun State', 'Federal Capital Territory', 'Rivers State'];
   const propertyTypes = ['apartment', 'house', 'hostel'];
@@ -39,7 +40,7 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
   };
 
   const filteredProperties = useMemo(() => {
-    let filtered = mockProperties.filter(property => {
+    let filtered = allProperties.filter(property => {
       const matchesSearch = !searchTerm || 
         property.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         property.location.toLowerCase().includes(searchTerm.toLowerCase());
@@ -78,6 +79,44 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
 
     return filtered;
   }, [searchTerm, selectedLocation, selectedType, priceRange, selectedAmenities, sortBy]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res  =  await fetch(`http://localhost:2100/product/all`)
+        const all = await res.json();
+        if (!mounted) return;
+        // Map backend product shape to frontend Property type
+        const mapped = (all || []).map((p: any): Property => ({
+          id: String(p.id || p._id || p.productId || Date.now()),
+          title: p.title || p.name || 'Untitled',
+          description: p.description || p.desc || '',
+          price: Number(p.rent || p.price || p.amount || 0),
+          location: p.location || p.address || '',
+          propertyType: (p.type || p.propertyType || 'apartment') as any,
+          bedrooms: Number(p.bedrooms || p.rooms || 1),
+          bathrooms: Number(p.bathrooms || p.toilets || 1),
+          amenities: Array.isArray(p.amnities) ? p.amnities : (p.amnities ? JSON.parse(p.amnities as string) : (p.amenities || [])),
+          images: Array.isArray(p.pictures) ? p.pictures : (p.pictures ? JSON.parse(p.pictures as string) : (p.images || [])),
+          landlord: p.landlord || { id: 'unknown', name: p.owneremail || p.ownerName || 'Owner', phone: p.contactinfo || '', email: p.owneremail || '' , verified: false, rating: 0, properties: 0 },
+          agent: undefined,
+          isBoostingActive: Boolean(p.boost || p.isBoostingActive),
+          boostingTier: (p.boostingTier || p.boostType || p.plan) as any,
+          boostingExpiresAt: p.boostingExpiresAt || p.expiry || undefined,
+          safetyRating: Number(p.safetyRating || p.safety || 4.0),
+          views: Number(p.views || p.currentViews || 0),
+          inquiries: Number(p.inquiries || 0),
+          createdAt: p.createdAt || new Date().toISOString(),
+          updatedAt: p.updatedAt || new Date().toISOString(),
+        }));
+        setAllProperties(mapped);
+      } catch (err) {
+        console.error('Failed to load properties', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -169,7 +208,7 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
                   <div key={amenity} className="flex items-center space-x-2">
                     <Checkbox
                       checked={selectedAmenities.includes(amenity)}
-                      onCheckedChange={(checked) => handleAmenityChange(amenity, checked as boolean)}
+                      onCheckedChange={(checked: boolean) => handleAmenityChange(amenity, checked)}
                     />
                     <label className="text-sm text-gray-700 capitalize">
                       {amenity}
@@ -215,13 +254,12 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
                 {property.isBoostingActive && (
                   <Badge className="absolute top-2 right-2 bg-yellow-500 text-white">
                     <TrendingUp className="h-3 w-3 mr-1" />
-                    {property.boostType === 'elite' ? 'Elite' : 
-                     property.boostType === 'premium' ? 'Premium' : 'Basic'}
+                    {property.boostingTier ? property.boostingTier : 'Basic'}
                   </Badge>
                 )}
                 <div className="absolute bottom-2 left-2">
                   <Badge variant="secondary" className="bg-white/90 text-gray-800 capitalize">
-                    {property.type}
+                    {property.propertyType}
                   </Badge>
                 </div>
               </div>
@@ -244,7 +282,7 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
                   <div className="flex items-center">
                     <Star className="h-4 w-4 text-yellow-400 mr-1" />
                     <span className="text-sm text-gray-600">
-                      {property.safetyRating} ({property.reviews} reviews)
+                      {property.safetyRating} ({property.views} views)
                     </span>
                   </div>
                   {property.landlord.verified && (
@@ -284,7 +322,7 @@ export function PropertySearch({ onPropertySelect }: PropertySearchProps) {
                       View Details
                     </Button>
                     <Button 
-                      onClick={() => handleQuickContact(
+                      onClick={() => sendWhatsAppMessage(
                         property.landlord.name, 
                         property.landlord.phone, 
                         property.title

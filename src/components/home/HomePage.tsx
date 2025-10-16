@@ -6,25 +6,42 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ImageWithFallback } from '../figma/ImageWithFallback';
-import { mockProperties } from '../../data/mockProperties';
+import { getAllProducts } from '../../api/api';
 import { Property, PageType } from '../../types';
 import { useWhatsAppContact } from '../../hooks';
+// import { userInfo } from 'os';
+// import { useUser } from '../../context/UserContext'
 
 interface HomePageProps {
   onPropertySelect: (property: Property) => void;
   onNavigate: (page: PageType) => void;
 }
-
+const API_URL = `https://dormdash-backend.vercel.app`
 export function HomePage({ onPropertySelect, onNavigate }: HomePageProps) {
   const [searchLocation, setSearchLocation] = useState('');
   const [searchType, setSearchType] = useState('');
+  const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
   const { sendWhatsAppMessage } = useWhatsAppContact();
+  // const {email} = useUser();
 
   const handleSearch = () => {
     onNavigate('search');
   };
 
-  const featuredProperties = mockProperties.slice(0, 3);
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const all = await getAllProducts();
+        if (!mounted) return;
+        // guard if API returns undefined/null
+        setFeaturedProperties((all || []).slice(0, 3));
+      } catch (err) {
+        console.error('Failed to load properties', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="min-h-screen">
@@ -57,6 +74,7 @@ export function HomePage({ onPropertySelect, onNavigate }: HomePageProps) {
                   />
                 </div>
               </div>
+              
               
               <div>
                 <label className="block text-gray-700 mb-2">Property Type</label>
@@ -124,7 +142,7 @@ export function HomePage({ onPropertySelect, onNavigate }: HomePageProps) {
       </section>
 
       {/* Featured Properties */}
-      <section className="py-12 sm:py-16 md:py-20 bg-gray-50">
+      {/* <section className="py-12 sm:py-16 md:py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8 sm:mb-10 md:mb-12">
             <h2 className="text-2xl sm:text-3xl md:text-4xl text-gray-900 mb-3 sm:mb-4">Featured Properties</h2>
@@ -132,76 +150,96 @@ export function HomePage({ onPropertySelect, onNavigate }: HomePageProps) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-            {featuredProperties.map((property) => (
-              <Card 
-                key={property.id} 
-                className="overflow-hidden hover:shadow-xl transition-shadow cursor-pointer bg-white"
-                onClick={() => onPropertySelect(property)}
-              >
-                <div className="relative h-48 sm:h-56 md:h-64 bg-gray-200">
-                  <ImageWithFallback
-                    src={property.images[0]}
-                    alt={property.title}
-                    className="w-full h-full object-cover"
-                  />
-                  {property.landlord.verified && (
-                    <Badge className="absolute top-3 right-3 bg-green-500 text-white border-0">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Verified
-                    </Badge>
-                  )}
-                  {property.isBoostingActive && (
-                    <Badge className="absolute top-3 left-3 bg-yellow-500 text-white border-0">
-                      <Star className="h-3 w-3 mr-1" />
-                      Featured
-                    </Badge>
-                  )}
-                </div>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base sm:text-lg line-clamp-2">{property.title}</CardTitle>
-                  <div className="flex items-center text-gray-600 text-sm mt-2">
-                    <MapPin className="h-4 w-4 mr-1" />
-                    {property.location}
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex justify-between items-center mb-4">
-                    <div>
-                      <span className="text-xl sm:text-2xl text-blue-600">₦{property.price.toLocaleString()}</span>
-                      <span className="text-gray-500 text-sm">/year</span>
-                    </div>
-                    <div className="flex items-center bg-yellow-50 px-2 py-1 rounded">
-                      <Star className="h-4 w-4 text-yellow-500 mr-1" />
-                      <span className="text-sm">{property.safetyRating}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {property.amenities.slice(0, 3).map((amenity) => (
-                      <Badge key={amenity} variant="outline" className="text-xs">
-                        {amenity}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      sendWhatsAppMessage(
-                        property.landlord.name,
-                        property.landlord.phone,
-                        property.title
-                      );
-                    }}
-                    variant="outline"
-                    className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+            {Array.isArray(featuredProperties) && featuredProperties.length > 0 ? (
+              featuredProperties.map((property) => {
+                const imageSrc = property?.pictures?.[0] || '/placeholder.jpg';
+                const landlord = property?.landlord || { name: 'Owner', phone: '', verified: false };
+                const price = typeof property?.price === 'number' ? property.price : Number(property?.rent || 0);
+                const amenities = Array.isArray(property?.amenities) ? property.amenities : [];
+                return (
+                  <Card 
+                    key={property?.id || `${property?.title}-${Math.random()}`} 
+                    className="overflow-hidden hover:shadow-xl transition-shadow cursor-pointer bg-white"
+                    onClick={() => onPropertySelect(property)}
                   >
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Quick Contact via WhatsApp
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="relative h-48 sm:h-56 md:h-64 bg-gray-200">
+                      <ImageWithFallback
+                        src={imageSrc}
+                        alt={property?.title || 'Property'}
+                        className="w-full h-full object-cover"
+                      />
+                      {landlord.verified && (
+                        <Badge className="absolute top-3 right-3 bg-green-500 text-white border-0">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      )}
+                      {property?.isBoostingActive && (
+                        <Badge className="absolute top-3 left-3 bg-yellow-500 text-white border-0">
+                          <Star className="h-3 w-3 mr-1" />
+                          Featured
+                        </Badge>
+                      )}
+                    </div>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base sm:text-lg line-clamp-2">{property?.title || 'Untitled'}</CardTitle>
+                      <div className="flex items-center text-gray-600 text-sm mt-2">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        {property?.location || 'Location not specified'}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex justify-between items-center mb-4">
+                        <div>
+                          <span className="text-xl sm:text-2xl text-blue-600">₦{(price || 0).toLocaleString()}</span>
+                          <span className="text-gray-500 text-sm">/year</span>
+                        </div>
+                        <div className="flex items-center bg-yellow-50 px-2 py-1 rounded">
+                          <Star className="h-4 w-4 text-yellow-500 mr-1" />
+                          <span className="text-sm">{property?.safetyRating ?? 'N/A'}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {amenities.slice(0, 3).map((amenity) => (
+                          <Badge key={amenity} variant="outline" className="text-xs">
+                            {amenity}
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <Button
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          sendWhatsAppMessage(
+                            landlord.name,
+                            landlord.phone,
+                            property?.title || ''
+                          );
+                          const res = fetch(`http://localhost:2100/profile/updateListing`,{
+                            method: 'POST',
+                            headers:{
+                              'Content-Type':'application/json',
+                              Accept:'application/json'
+                            },
+                            body: JSON.stringify({
+                              email: userInfo
+                            })
+                          })
+                        }}
+                        variant="outline"
+                        className="w-full border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Quick Contact via WhatsApp
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <div className="col-span-full text-center text-gray-500">No featured properties available</div>
+            )}
           </div>
 
           <div className="text-center mt-8 sm:mt-10 md:mt-12">
@@ -213,7 +251,7 @@ export function HomePage({ onPropertySelect, onNavigate }: HomePageProps) {
             </Button>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* How It Works */}
       <section className="py-12 sm:py-16 md:py-20 bg-white">

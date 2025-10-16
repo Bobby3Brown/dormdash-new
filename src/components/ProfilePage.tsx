@@ -9,22 +9,52 @@ import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { User as UserType, PageType } from '../types';
-import { toast } from 'sonner@2.0.3';
+import { useUser } from '../context/UserContext';
+import { toast } from 'sonner';
 
 interface ProfilePageProps {
-  user: UserType;
+  user?: UserType;
   onNavigate: (page: PageType) => void;
   onUpdateUser: (user: UserType) => void;
 }
 
 export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps) {
+  const ctx = useUser();
+  const resolvedUser: UserType = user ?? ({
+    id: 'ctx-user',
+    name: ctx.fullname || 'User',
+    email: ctx.email || '',
+    phone: ctx.number || '',
+    role: (ctx.mode as any) || 'student',
+    verified: false
+  } as UserType);
+
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editedUser, setEditedUser] = useState(user);
+  const [editedUser, setEditedUser] = useState<UserType>(resolvedUser);
 
   const handleSaveProfile = () => {
-    onUpdateUser(editedUser);
-    setIsEditMode(false);
-    toast.success('Profile updated successfully!');
+    (async () => {
+      try {
+        // Attempt to update server profile; API expects email+password for auth per spec.
+        // If you have token-based auth, the server should accept the auth header instead.
+        await (await import('../api/api')).updateProfile({
+          email: editedUser.email,
+          // password: '', // if required, wire password or token flow
+          fullName: editedUser.name,
+          number: editedUser.phone,
+          level: (editedUser as any).level
+        });
+        onUpdateUser(editedUser);
+        setIsEditMode(false);
+        toast.success('Profile updated successfully!');
+      } catch (err) {
+        console.error('Profile update failed', err);
+        // fallback to local update
+        onUpdateUser(editedUser);
+        setIsEditMode(false);
+        toast.error('Profile update failed on server; saved locally');
+      }
+    })();
   };
 
   const handleInputChange = (field: keyof UserType, value: string) => {
@@ -33,18 +63,18 @@ export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps
 
   const stats = [
     { 
-      label: user.role === 'landlord' ? 'Properties Listed' : 'Properties Managed', 
+      label: resolvedUser.role === 'landlord' ? 'Properties Listed' : 'Properties Managed', 
       value: '6', 
       icon: Home 
     },
     { 
-      label: user.role === 'landlord' ? 'Total Inquiries' : 'Active Clients', 
-      value: user.role === 'landlord' ? '47' : '12', 
+        label: resolvedUser.role === 'landlord' ? 'Total Inquiries' : 'Active Clients', 
+        value: resolvedUser.role === 'landlord' ? '47' : '12', 
       icon: List 
     },
     { 
-      label: 'Account Status', 
-      value: user.verified ? 'Verified' : 'Pending', 
+        label: 'Account Status', 
+        value: resolvedUser.verified ? 'Verified' : 'Pending', 
       icon: CheckCircle 
     }
   ];
@@ -59,9 +89,9 @@ export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps
               {/* Avatar */}
               <div className="relative">
                 <Avatar className="h-24 w-24 sm:h-32 sm:w-32">
-                  <AvatarImage src={user.avatar} />
+                  <AvatarImage src={resolvedUser.avatar} />
                   <AvatarFallback className="text-2xl sm:text-3xl bg-blue-100 text-blue-600">
-                    {user.name.charAt(0).toUpperCase()}
+                    {resolvedUser.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <Dialog>
@@ -91,12 +121,12 @@ export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps
               <div className="flex-1 text-center sm:text-left">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2">
                   <div>
-                    <h1 className="text-2xl sm:text-3xl text-gray-900">{user.name}</h1>
+                    <h1 className="text-2xl sm:text-3xl text-gray-900">{resolvedUser.name}</h1>
                     <div className="flex items-center justify-center sm:justify-start space-x-2 mt-1">
                       <Badge className="capitalize">
-                        {user.role}
+                        {resolvedUser.role}
                       </Badge>
-                      {user.verified && (
+                      {resolvedUser.verified && (
                         <Badge variant="outline" className="text-green-600 border-green-600">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Verified
@@ -117,15 +147,15 @@ export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps
                 <div className="space-y-2 mt-4 text-sm text-gray-600">
                   <div className="flex items-center justify-center sm:justify-start">
                     <Mail className="h-4 w-4 mr-2" />
-                    {user.email}
+                    {resolvedUser.email}
                   </div>
                   <div className="flex items-center justify-center sm:justify-start">
                     <Phone className="h-4 w-4 mr-2" />
-                    {user.phone}
+                    {resolvedUser.phone}
                   </div>
                   <div className="flex items-center justify-center sm:justify-start">
                     <Calendar className="h-4 w-4 mr-2" />
-                    Joined {user.registrationDate || 'Recently'}
+                    Joined {resolvedUser.registrationDate || 'Recently'}
                   </div>
                 </div>
               </div>
@@ -182,7 +212,7 @@ export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps
                   variant="outline"
                   onClick={() => {
                     setIsEditMode(false);
-                    setEditedUser(user);
+                    setEditedUser(resolvedUser);
                   }}
                 >
                   Cancel
@@ -211,15 +241,15 @@ export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button
-              onClick={() => onNavigate(user.role === 'landlord' ? 'landlord-dashboard' : 'agent-dashboard')}
-              className="w-full bg-blue-600 hover:bg-blue-700 justify-start"
-            >
+                <Button
+                  onClick={() => onNavigate(resolvedUser.role === 'landlord' ? 'landlord-dashboard' : 'agent-dashboard')}
+                  className="w-full bg-blue-600 hover:bg-blue-700 justify-start"
+                >
               <Home className="h-4 w-4 mr-2" />
               Go to Dashboard
             </Button>
             
-            {user.role === 'landlord' && (
+            {resolvedUser.role === 'landlord' && (
               <Button
                 onClick={() => onNavigate('landlord-dashboard')}
                 variant="outline"
@@ -266,10 +296,10 @@ export function ProfilePage({ user, onNavigate, onUpdateUser }: ProfilePageProps
         <Card className="mt-8 bg-gradient-to-r from-blue-50 to-white border-blue-200">
           <CardContent className="p-6">
             <h3 className="text-lg text-gray-900 mb-3">
-              {user.role === 'landlord' ? '🏠 Landlord Benefits' : '🤝 Agent Benefits'}
+              {resolvedUser.role === 'landlord' ? '🏠 Landlord Benefits' : '🤝 Agent Benefits'}
             </h3>
             <ul className="space-y-2 text-sm text-gray-700">
-              {user.role === 'landlord' ? (
+              {resolvedUser.role === 'landlord' ? (
                 <>
                   <li>✓ List unlimited properties</li>
                   <li>✓ Boost listings for better visibility</li>

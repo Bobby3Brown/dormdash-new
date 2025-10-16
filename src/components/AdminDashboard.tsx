@@ -9,10 +9,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { mockProperties } from '../data/mockProperties';
+import { getAllProducts } from '../api/api';
 
 export function AdminDashboard() {
   const [selectedTab, setSelectedTab] = useState('overview');
+  const [properties, setProperties] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const all = await getAllProducts();
+        if (!mounted) return;
+        setProperties(all || []);
+      } catch (err) {
+        console.error('Failed to load properties for admin', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
   
   const stats = [
     { label: 'Total Properties', value: '2,847', icon: Home, change: '+12% this month' },
@@ -70,6 +85,9 @@ export function AdminDashboard() {
     { type: 'Premium Boost', duration: '2 weeks', minPrice: 5000, maxPrice: 10000, features: ['Top placement', 'Enhanced visibility', 'Social media promotion'] },
     { type: 'Elite Boost', duration: '1 month', minPrice: 10000, maxPrice: 20000, features: ['Featured placement', 'Maximum visibility', 'Dedicated support'] }
   ];
+
+  // TODO: fetch success stories from API when available. Placeholder empty list for now.
+  const successStories: any[] = [];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -316,7 +334,7 @@ export function AdminDashboard() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {mockProperties.map((property) => (
+        {properties.map((property) => (
               <Card key={property.id} className="group">
                 <CardContent className="p-4">
                   <h3 className="text-base sm:text-lg text-gray-900 mb-2 line-clamp-2">{property.title}</h3>

@@ -13,22 +13,46 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import { mockProperties } from '../data/mockProperties';
+import { getAllProducts, createProduct, updateProduct } from '../api/api';
+import { toast } from 'sonner';
 import { User as UserType } from '../types';
+import { useUser } from '../context/UserContext';
 
 interface AgentDashboardProps {
-  user: UserType;
+  user?: UserType;
 }
 
 export function AgentDashboard({ user }: AgentDashboardProps) {
+  const ctx = useUser();
+  const resolvedUser: UserType = user ?? ({
+    id: 'ctx-user',
+    name: ctx.fullname || 'Agent',
+    email: ctx.email || '',
+    phone: ctx.number || '',
+    role: (ctx.mode as any) || 'agent',
+    verified: false
+  } as UserType);
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isAddPropertyOpen, setIsAddPropertyOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // Mock agent data
-  const agentProperties = mockProperties;
+  const [agentProperties, setAgentProperties] = useState<any[]>([]);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const all = await getAllProducts();
+        if (!mounted) return;
+        setAgentProperties(all || []);
+      } catch (err) {
+        console.error('Failed to load agent properties', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // Sidebar menu items
   const sidebarMenu = [
@@ -43,40 +67,11 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
 
-  // Mock student messages for agents
-  const studentMessages = [
-    {
-      id: 1,
-      studentName: 'Kemi Adebayo',
-      propertyTitle: 'Modern Apartment Near UNILAG',
-      time: '2 hours ago',
-      message: 'Hi, I\'m interested in this apartment. Can we schedule a viewing this weekend?',
-      phone: '+234801234567'
-    },
-    {
-      id: 2,
-      studentName: 'Daniel Okoro',
-      propertyTitle: 'Student Hostel UI Campus',
-      time: '1 day ago',
-      message: 'Is this property still available? I need accommodation urgently.',
-      phone: '+234803456789'
-    },
-    {
-      id: 3,
-      studentName: 'Blessing Eze',
-      propertyTitle: '3-Bedroom House Covenant University',
-      time: '2 days ago',
-      message: 'What are the payment terms for this house? Can I pay in installments?',
-      phone: '+234805678901'
-    }
-  ];
+  // TODO: fetch student messages from API. Replaced mock data with empty array.
+  const studentMessages: any[] = [];
 
-  // Mock boosted properties for agents
-  const boostedProperties = [
-    { id: 1, name: 'Modern Apartment Near UNILAG', plan: 'Pro Plan', expiry: 'Oct 15, 2024', status: 'Active' },
-    { id: 2, name: 'Student Hostel UI Campus', plan: 'Basic Plan', expiry: 'Oct 12, 2024', status: 'Active' },
-    { id: 3, name: '3-Bedroom House', plan: 'Premium Plan', expiry: 'Oct 20, 2024', status: 'Active' }
-  ];
+  // TODO: fetch boosting info from API. Replaced with empty list.
+  const boostedProperties: any[] = [];
 
   const handleWhatsAppMessage = (phone: string, propertyTitle: string, studentName: string) => {
     const message = `Hi ${studentName}, thank you for your interest in "${propertyTitle}". I'm Jane Agent from DormDash and I'd be happy to help you with this property. When would be a good time for a viewing?`;
@@ -165,8 +160,7 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
           <Label htmlFor="clientEmail">Email Address</Label>
           <Input id="clientEmail" type="email" placeholder="client@email.com" />
         </div>
-      </div>
-      
+  </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="clientPhone">Phone Number</Label>
@@ -194,8 +188,9 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
     </div>
   );
 
-  const AddPropertyForm = () => {
-    const [formData, setFormData] = useState({
+  const AddPropertyForm = ({ initialData }: { initialData?: any } = {}) => {
+    const [showImage, setShowImage] = useState<string>('')
+    const [formData, setFormData] = useState(() => ({
       title: '',
       type: '',
       location: '',
@@ -203,21 +198,21 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
       bedrooms: '',
       bathrooms: '',
       description: '',
-      amenities: [],
-      images: [],
+      amenities: [] as string[],
+      images: [] as string[],
       landlordName: '',
       landlordPhone: '',
       landlordEmail: '',
       commissionRate: '7',
       availableDate: ''
-    });
+    , ...initialData }));
 
     const availableAmenities = [
       'wifi', 'electricity', 'water', 'parking', 'generator', 'security', 
       'furnished', 'kitchen', 'laundry', 'cleaning', 'gym', 'pool'
     ];
 
-    const handleAmenityToggle = (amenity) => {
+    const handleAmenityToggle = (amenity: string) => {
       setFormData(prev => ({
         ...prev,
         amenities: prev.amenities.includes(amenity)
@@ -226,10 +221,48 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
       }));
     };
 
-    const handleSubmit = () => {
-      console.log('Agent property data:', formData);
-      // Here you would typically send the data to your backend
-      setIsAddPropertyOpen(false);
+    const handleSubmit = async () => {
+      try {
+        const payload = {
+          title: formData.title,
+          type: formData.type,
+          location: formData.location,
+          rent: Number(formData.price || 0),
+          bedrooms: Number(formData.bedrooms) || 1,
+          availability: formData.availableDate,
+          amnities: formData.amenities,
+          boost: 0,
+          description: formData.description,
+          contactinfo: `${formData.landlordName} | ${formData.landlordPhone} | ${formData.landlordEmail}`,
+          pictures: formData.images,
+          owneremail: formData.landlordEmail || resolvedUser.email || ''
+        };
+
+        if (initialData && initialData.id) {
+          // Update existing product
+          await updateProduct(initialData.id, payload);
+          toast.success('Property updated successfully');
+        } else {
+          // Create new product
+          await createProduct(payload);
+          toast.success('Property created successfully');
+        }
+
+        // Refresh properties list
+        try {
+          const all = await getAllProducts();
+          setAgentProperties(all || []);
+        } catch (e) {
+          console.error('Failed to refresh properties', e);
+        }
+
+        // Clear editing state and close form
+        setEditingProduct(null);
+        setIsAddPropertyOpen(false);
+      } catch (err) {
+        console.error('Failed to create/update property', err);
+        toast.error('Failed to create/update property');
+      }
     };
 
     return (
@@ -413,19 +446,86 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
         </div>
         
         {/* Images */}
-        <div>
-          <Label>Property Images *</Label>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-            <p className="text-sm text-gray-600 mb-2">Upload up to 10 high-quality photos</p>
-            <p className="text-xs text-gray-500 mb-3">Include exterior, interior, bedrooms, kitchen, bathroom, and nearby areas</p>
-            <Button variant="outline" size="sm">Choose Files</Button>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Tip: Properties with professional photos get 60% more inquiries
-          </p>
-        </div>
+         <>
+                <Label>Property Images</Label>
+                {
+                  showImage === '' ? (
+                     <div>
+                  
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600 mb-2">
+                        Upload up to 10 high-quality photos (optional)
+                      </p>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Include exterior, interior, bedrooms, kitchen, bathroom, and
+                        nearby areas
+                      </p>
         
+                      <input
+                        type="file"
+                        id="landlord-images-input"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files || []);
+                           const formData = new FormData();
+                          if (files.length === 0) return;
+                          try {
+                            for (const f of files) {
+                             
+        formData.append("file", files[0]); // from an <input type="file" />
+        
+        fetch(`http://localhost:2100/uploads`, {
+          method: "POST",
+          body: formData,
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            console.log("Uploaded file URL:", data.url);
+            setShowImage(data.url);
+             setFormData((prev) => ({
+                ...prev,
+                images: [...prev.images, data.url],
+              }));
+          })
+          .catch((err) => console.error("Upload failed:", err));
+                            }
+                            (e.target as HTMLInputElement).value = "";
+                          } catch (err) {
+                            console.error("Image upload failed", err);
+                          }
+                        }}
+                      />
+        
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          document.getElementById("landlord-images-input")?.click()
+                        }
+                      >
+                        Choose Files
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Tip: Properties with more photos get 40% more views
+                  </p>
+                </div>
+                  ):(
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <>
+                      <div className="w-100 h-100">
+                        <img src={showImage} className="" />
+                      </div>
+                      </>
+                    </div>
+                  )
+                }
+                </>
         <div className="flex justify-end space-x-2 pt-4 border-t">
           <Button variant="outline" onClick={() => setIsAddPropertyOpen(false)}>
             Cancel
@@ -592,7 +692,7 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl text-gray-900 mb-2">Agent Dashboard</h1>
-          <p className="text-gray-600">Welcome back, {user.name}!</p>
+          <p className="text-gray-600">Welcome back, {resolvedUser.name}!</p>
         </div>
 
         {/* Stats Cards */}
@@ -728,7 +828,7 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
               {agentProperties.slice(0, 3).map((property) => (
                 <div key={property.id} className="border rounded-lg p-4 hover:shadow-lg transition-shadow">
                   <ImageWithFallback
-                    src={property.images[0]}
+                    src={property.pictures[0]}
                     alt={property.title}
                     className="w-full h-32 object-cover rounded-lg mb-3"
                   />
@@ -805,18 +905,42 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
                 
                 <p className="text-xs text-gray-500 mb-3">15 inquiries this week</p>
                 
-                <div className="flex space-x-2">
-                  <Button size="sm" variant="outline" className="flex-1">
-                    <Edit className="h-3 w-3 mr-1" />
-                    Edit
-                  </Button>
-                  <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700">
-                    Mark as Rented
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <Eye className="h-3 w-3" />
-                  </Button>
-                </div>
+                  <div className="flex space-x-2">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => { setEditingProduct(property); setActiveSection('add-property'); }}>
+                      <Edit className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      onClick={async () => {
+                        try {
+                          const newStatus = property?.availability === 'Rented' ? 'Available' : 'Rented';
+                          const res = await fetch(`http://localhost:2100/product/${property.id}/availability`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ availability: newStatus }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) throw new Error(data.error || 'Update failed');
+
+                          // Update local state
+                          setAgentProperties((prev) => prev.map((p) => (p.id === property.id ? { ...p, availability: newStatus } : p)));
+
+                          const msg = newStatus === 'Rented' ? 'Property marked as Rented' : 'Property marked as Available';
+                          toast.success(`✅ ${msg}`);
+                        } catch (err) {
+                          console.error('Failed to update availability', err);
+                          toast.error('❌ Failed to update property status');
+                        }
+                      }}
+                    >
+                      {property?.availability === 'Rented' ? 'Mark as Available' : 'Mark as Rented'}
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                  </div>
               </CardContent>
             </Card>
           ))}
@@ -1189,7 +1313,7 @@ export function AgentDashboard({ user }: AgentDashboardProps) {
 
         <Card>
           <CardContent className="p-6">
-            <AddPropertyForm />
+            <AddPropertyForm initialData={editingProduct || undefined} />
           </CardContent>
         </Card>
       </div>

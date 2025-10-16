@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { getAllProducts } from '../api/api';
 
 export function BoostingServices() {
   const [selectedProperty, setSelectedProperty] = useState('');
@@ -68,11 +69,21 @@ export function BoostingServices() {
     }
   ];
 
-  const mockProperties = [
-    { id: 1, title: 'Modern 2-Bedroom Apartment', location: 'Akoka, Lagos', currentViews: 145 },
-    { id: 2, title: 'Student Hostel Complex', location: 'UI Campus, Ibadan', currentViews: 89 },
-    { id: 3, title: '3-Bedroom House', location: 'Ota, Ogun State', currentViews: 67 }
-  ];
+  const [properties, setProperties] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const all = await getAllProducts();
+        if (!mounted) return;
+        setProperties(all || []);
+      } catch (err) {
+        console.error('Failed to load properties for boosting', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const successStories = [
     {
@@ -200,8 +211,8 @@ export function BoostingServices() {
                 <SelectValue placeholder="Choose a property to boost" />
               </SelectTrigger>
               <SelectContent>
-                {mockProperties.map((property) => (
-                  <SelectItem key={property.id} value={property.id.toString()}>
+                {properties.map((property) => (
+                  <SelectItem key={property.id} value={String(property.id)}>
                     {property.title} - {property.location}
                   </SelectItem>
                 ))}
@@ -215,7 +226,7 @@ export function BoostingServices() {
                   <div>
                     <p className="text-xs text-gray-600">Monthly Views</p>
                     <p className="text-lg text-gray-900">
-                      {mockProperties.find(p => p.id.toString() === selectedProperty)?.currentViews || 0}
+                      {properties.find((p) => String(p.id) === selectedProperty)?.currentViews || 0}
                     </p>
                   </div>
                   <div>
