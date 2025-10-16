@@ -17,6 +17,7 @@ interface HomePageProps {
   onNavigate: (page: PageType) => void;
 }
 const API_URL = `https://dormdash-backend.vercel.app`
+// const API_URL = `http://localhost:2100`
 export function HomePage({ onPropertySelect, onNavigate }: HomePageProps) {
   const [searchLocation, setSearchLocation] = useState('');
   const [searchType, setSearchType] = useState('');

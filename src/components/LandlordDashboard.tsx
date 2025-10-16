@@ -76,6 +76,7 @@ interface LandlordDashboardProps {
   user?: UserType;
 }
 const API_URL = `https://dormdashbackend.onrender.com`
+// const API_URL = `http://localhost:2100`
 
 export function LandlordDashboard({ user }: LandlordDashboardProps) {
   const ctx = useUser();
@@ -241,63 +242,86 @@ export function LandlordDashboard({ user }: LandlordDashboardProps) {
     };
 
     const handleSubmit = async () => {
-      const payload = {
-        title: formData.title,
-        type: formData.type,
-        rent: Number(formData.price),
-        owneremail: resolvedUser.email,
-        location: formData.location,
-        bedrooms: Number(formData.bedrooms) || 0,
-        availability: formData.availableDate || "available",
-        amnities: JSON.stringify(formData.amenities || []),
-        boost: 0,
-        description: formData.description,
-        contactinfo: formData.contactPhone,
-        pictures: JSON.stringify(formData.images || []),
-      };
-      console.log(payload)
+  // ✅ Basic field validation
+  if (!formData.title || !formData.type || !formData.location || !formData.price) {
+    toast.error("Please fill in all required fields");
+    return;
+  }
 
-      try {
-        const res = await fetch(`${API_URL}/product/create`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+  // ✅ Build payload matching backend schema
+  const payload = {
+    title: formData.title.trim(),
+    type: formData.type.trim(),
+    rent: Number(formData.price),
+    owneremail: resolvedUser.email,
+    location: formData.location.trim(),
+    bedrooms: Number(formData.bedrooms) || 0,
+    availability: formData.availableDate || "available",
+    amenities: formData.amenities || [],
+    boost: 0,
+    description: formData.description?.trim() || "",
+    contactinfo: formData.contactPhone?.trim() || "",
+    pictures: formData.images || [],
+  };
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || "Failed to create product");
-        }
+  console.log("📦 Creating product payload:", payload);
 
-        // if (!res.ok) throw new Error(data.error || "Update failed");
-        const next = await fetch(
-          `${API_URL}/profile/updateListing`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({
-              email: resolvedUser.email,
-              rented: 0,
-              active: 1,
-            }),
-          }
-        );
-        const test = await next.json().catch(() => ({}));
-        if (!next.ok) throw new Error(test.error || "Update failed");
-        toast("Success");
+  try {
+    // ✅ Create the product
+    const res = await fetch(`${API_URL}/product/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-        const data = await res.json();
-        toast.success("✅ Property listed successfully!");
-        console.log("Created:", data);
-        setIsAddPropertyOpen(false);
-      } catch (err) {
-        console.error("❌ Error:", err);
-        toast.error("Failed to list property. Please try again.");
-      }
-    };
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to create product");
+    }
+
+    // ✅ Update landlord listing count
+    const next = await fetch(`${API_URL}/profile/updateListing`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        email: resolvedUser.email,
+        rented: 0,
+        active: 1,
+      }),
+    });
+
+    const update = await next.json().catch(() => ({}));
+    if (!next.ok) throw new Error(update.error || "Profile update failed");
+
+    toast.success("✅ Property listed successfully!");
+    console.log("Created product:", data);
+
+    // ✅ Reset form
+    setFormData({
+      title: "",
+      type: "",
+      location: "",
+      price: "",
+      bedrooms: "",
+      bathrooms: "",
+      description: "",
+      amenities: [],
+      images: [],
+      contactPhone: "",
+      availableDate: "",
+    });
+
+    setIsAddPropertyOpen(false);
+  } catch (err) {
+    console.error("❌ Error creating product:", err);
+    toast.error("Failed to list property. Please try again.");
+  }
+};
+
     const handleImageChange = (e) => {
       const files = Array.from(e.target.files);
       const fileURLs = files.map((file) => URL.createObjectURL(file));
@@ -489,86 +513,114 @@ export function LandlordDashboard({ user }: LandlordDashboardProps) {
         </div>
 
         {/* Images */}
-        <>
-        <Label>Property Images</Label>
-        {
-          showImage === '' ? (
-             <div>
+        
+          <>
+            <Label>Property Images</Label>
+            {showImage === "" ? (
+              <div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-2">
+                    Upload up to 10 high-quality photos (optional)
+                  </p>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Include exterior, interior, bedrooms, kitchen, bathroom, and nearby areas
+                  </p>
+            
+                  {/* File Input */}
+                  <input
+                    type="file"
+                    id="landlord-images-input"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length === 0) return;
+                    
+                      try {
+                        const fd = new FormData();
+                        // append each file with the same field name "files"
+                        files.forEach((file) => fd.append("files", file));
+                      
+                        const res = await fetch(`${API_URL}/uploads`, {
+                          method: "POST",
+                          body: fd,
+                        });
+                      
+                        const data = await res.json().catch(() => null);
+                      
+                        if (!res.ok || !data) {
+                          console.error("Upload failed", data);
+                          toast.error("Image upload failed");
+                          (e.target as HTMLInputElement).value = "";
+                          return;
+                        }
+                      
+                        // Extract URLs (support different shapes)
+                        let uploadedUrls = [];
+                        if (Array.isArray(data.urls)) uploadedUrls = data.urls;
+                        else if (Array.isArray(data.files)) uploadedUrls = data.files;
+                        else if (typeof data.url === "string") uploadedUrls = [data.url];
+                        else if (Array.isArray(data)) uploadedUrls = data;
+                      
+                        if (uploadedUrls.length === 0) {
+                          toast.error("No uploaded URLs returned");
+                        } else {
+                          setShowImage(uploadedUrls[0]);
+                          setFormData((prev) => ({
+                            ...prev,
+                            images: [...prev.images, ...uploadedUrls],
+                          }));
+                          toast.success("✅ Images uploaded successfully!");
+                        }
+                      
+                        // Reset input so the same file can be reselected
+                        (e.target as HTMLInputElement).value = "";
+                      } catch (err) {
+                        console.error("Upload error", err);
+                        toast.error("Image upload failed");
+                        (e.target as HTMLInputElement).value = "";
+                      }
+                    }}
+                  />
           
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-2">
-                Upload up to 10 high-quality photos (optional)
-              </p>
-              <p className="text-xs text-gray-500 mb-3">
-                Include exterior, interior, bedrooms, kitchen, bathroom, and
-                nearby areas
-              </p>
-
-              <input
-                type="file"
-                id="landlord-images-input"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={async (e) => {
-                  const files = Array.from(e.target.files || []);
-                   const formData = new FormData();
-                  if (files.length === 0) return;
-                  try {
-                    for (const f of files) {
-                     
-formData.append("file", files[0]); // from an <input type="file" />
-
-fetch(`${API_URL}/uploads`, {
-  method: "POST",
-  body: formData,
-})
-  .then((res) => res.json())
-  .then((data) => {
-    console.log("Uploaded file URL:", data.url);
-    setShowImage(data.url);
-     setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, data.url],
-      }));
-  })
-  .catch((err) => console.error("Upload failed:", err));
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      document.getElementById("landlord-images-input")?.click()
                     }
-                    (e.target as HTMLInputElement).value = "";
-                  } catch (err) {
-                    console.error("Image upload failed", err);
-                  }
-                }}
-              />
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  document.getElementById("landlord-images-input")?.click()
-                }
-              >
-                Choose Files
-              </Button>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Tip: Properties with more photos get 40% more views
-          </p>
-        </div>
-          ):(
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <>
-              <div className="w-100 h-100">
-                <img src={showImage} className="" />
+                  >
+                    Choose Files
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Tip: Properties with more photos get 40% more views
+                </p>
               </div>
-              </>
-            </div>
-          )
-        }
-        </>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <div className="w-full h-full">
+                  <img
+                    src={showImage}
+                    alt="Property Preview"
+                    className="w-full h-64 object-cover rounded-lg"
+                  />
+                </div>
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowImage("")}
+                  >
+                    Upload More
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+
 
         <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4 border-t">
           <Button
@@ -585,7 +637,7 @@ fetch(`${API_URL}/uploads`, {
             List Property
           </Button>
         </div>
-      </div>
+        </div>
     );
   };
 
